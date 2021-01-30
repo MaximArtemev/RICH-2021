@@ -29,10 +29,10 @@ class DataHandler:
         if config.data.download:
             assert os.path.exists(config.data.data_path)
             log.info('config.data.download is True, starting dowload')
-            target_path = os.path.join(config.data.data_path, 'data_calibsample.tar.gz')
+            target_path = os.path.join(config.data.data_path, 'data_calibsample')
             if os.path.exists(target_path):
                 print("It seems that data is already downloaded. Are you sure?")
-            os.system(f"wget https://cernbox.cern.ch/index.php/s/Fjf3UNgvlRVa4Td/download -O {target_path}")
+            os.system(f"wget https://cernbox.cern.ch/index.php/s/Fjf3UNgvlRVa4Td/download -O {target_path + '.tar.gz'}")
             log.info('files downloaded, starting unpacking')
             os.system(f"tar xvf {target_path}")
             log.info('files unpacked')

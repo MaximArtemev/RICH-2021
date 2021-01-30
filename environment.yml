@@ -19,4 +19,6 @@ dependencies:
       - tqdm
       - wandb
       - hydra-core
+      - matplotlib
+      - seaborn
 prefix: /home/user/anaconda3/envs/rich2021

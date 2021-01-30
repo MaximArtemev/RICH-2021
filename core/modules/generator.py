@@ -16,7 +16,7 @@ class Generator(nn.Module):
         self.layers = self._build_layers()
 
     def _sample_latent(self, x):
-        return torch.randn(x.shape[0], self.config.model.G.noise_dim)
+        return torch.randn(x.shape[0], self.config.model.G.noise_dim, device=self.config.utils.device)
 
     def _build_layers(self):
         layers = []

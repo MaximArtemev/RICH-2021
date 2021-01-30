@@ -70,7 +70,8 @@ def train(gpu_num_if_use_ddp, config):
     sampled_context = torch.cat(sampled_context, dim=0)
     sampled_weight = torch.cat(sampled_weight, dim=0)
 
-    wandb.log({"hist/real": wandb.Histogram(sampled_data)}, caption=f"real data histogram")
+    wandb.log({"hist/real": wandb.Histogram(sampled_data)})
+
     dll_columns = ['RichDLLe', 'RichDLLk', 'RichDLLmu', 'RichDLLp', 'RichDLLbt']
 
     for epoch in range(0, config.experiment.epochs):
@@ -116,7 +117,7 @@ def train(gpu_num_if_use_ddp, config):
                     data, context, weight = prepare_batch(batch)
                     generated_samples.append(trainer.model.generate(data, context).to('cpu'))
                 generated_samples = torch.cat(generated_samples, dim=0)
-                wandb.log({"hist/generated": wandb.Histogram(generated_samples)}, caption=f"epoch_{epoch}")
+                wandb.log({"hist/generated": wandb.Histogram(generated_samples)})
 
                 fig, axes = plt.subplots(3, 2, figsize=(15, 15))
                 for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):

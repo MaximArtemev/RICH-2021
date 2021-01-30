@@ -1,1 +1,1 @@
-# RICH-2021
+# RICH Fast Sim GAN, PyTorch

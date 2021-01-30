@@ -1,0 +1,5 @@
+*.DS_Store*
+outputs
+run.sh
+*__pycache__*
+*.idea*

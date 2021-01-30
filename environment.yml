@@ -1,0 +1,22 @@
+name: rich2021
+channels:
+  - pytorch
+  - defaults
+dependencies:
+  - numpy
+  - pip
+  - python=3.6
+  - pytorch=1.7
+  - pip:
+      - h5py
+      - scipy
+      - pyyaml
+      - omegaconf
+      - scikit-learn
+      - dataclasses
+      - torchsummary
+      - pandas
+      - tqdm
+      - wandb
+      - hydra-core
+prefix: /home/user/anaconda3/envs/rich2021

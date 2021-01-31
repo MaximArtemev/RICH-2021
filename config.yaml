@@ -1,7 +1,7 @@
 data:
   data_path: "/home/mrartemev/Datasets/HEP/RICH-2021/"
   val_size: 0.1
-  download: False
+  download: True
   scaler:
     n_quantiles: 100000
 
@@ -33,7 +33,7 @@ experiment:
   checkpoint_path: '.'
   grad_clip: 10
   epochs: 1000
-  batch_size: 128
+  batch_size: 2048
   lr:
     G: 0.0001
     C: 0.0005

@@ -27,7 +27,8 @@ class DataHandler:
             self.scaler = StandardScaler()
 
         if config.data.download:
-            assert os.path.exists(config.data.data_path)
+            if not os.path.exists(config.data.data_path):
+                os.makedirs(config.data.data_path)
             log.info('config.data.download is True, starting dowload')
             target_path = os.path.join(config.data.data_path, 'data_calibsample')
             if os.path.exists(target_path):

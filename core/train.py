@@ -66,9 +66,9 @@ def train(gpu_num_if_use_ddp, config):
     for batch in val_dataloader:
         data, context, weight = batch
         sampled_data.append(data), sampled_context.append(context), sampled_weight.append(weight)
-    sampled_data = torch.cat(sampled_data, dim=0)
+    sampled_data = torch.cat(sampled_data, dim=0).numpy()
     sampled_context = torch.cat(sampled_context, dim=0)
-    sampled_weight = torch.cat(sampled_weight, dim=0)
+    sampled_weight = torch.cat(sampled_weight, dim=0).view(-1, 1).numpy()
 
     wandb.log({"hist/real": wandb.Histogram(sampled_data)})
 
@@ -121,9 +121,11 @@ def train(gpu_num_if_use_ddp, config):
 
                 fig, axes = plt.subplots(3, 2, figsize=(15, 15))
                 for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
-                    sns.distplot(sampled_data[:, particle_type], hist_kws={'weights': sampled_weight, 'alpha': 0.5},
+                    sns.distplot(sampled_data[:, particle_type].reshape(-1),
+                                 hist_kws={'weights': sampled_weight.reshape(-1), 'alpha': 0.5},
                                  kde=False, bins=100, ax=ax, label="real normalized data", norm_hist=True)
-                    sns.distplot(generated_samples[:, particle_type], hist_kws={'weights': sampled_weight, 'alpha': 0.5},
+                    sns.distplot(generated_samples[:, particle_type].reshape(-1),
+                                 hist_kws={'weights': sampled_weight.reshape(-1), 'alpha': 0.5},
                                  kde=False, bins=100, ax=ax, label="generated", norm_hist=True)
                     ax.legend()
                     ax.set_title(dll_columns[particle_type])

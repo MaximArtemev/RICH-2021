@@ -129,7 +129,7 @@ def train(gpu_num_if_use_ddp, config):
                                  kde=False, bins=100, ax=ax, label="generated", norm_hist=True)
                     ax.legend()
                     ax.set_title(dll_columns[particle_type])
-                wandb.log("hist/weighted_comparison", plt)
+                wandb.log({"hist/weighted_comparison": plt})
                 plt.clf()
 
         if (epoch + 1) % config.utils.eval_interval == 0 and main_node:

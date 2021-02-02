@@ -4,6 +4,7 @@ from tqdm import tqdm
 
 from core.data import list_particles
 
+
 def main():
     processes = []
     commands = []

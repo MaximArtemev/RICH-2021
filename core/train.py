@@ -17,12 +17,13 @@ import logging
 from omegaconf import OmegaConf
 
 log = logging.getLogger(__name__)
+os.environ["WANDB_API_KEY"] = "c26ec670e695fc64f8e21edaadfcdbb1ef590d6d"
 
 
 def setup_experiment(config):
     wandb.login()
     wandb.init(project=config.wandb.project_name,
-               config=OmegaConf.to_container(config, resolve=True),
+               config=OmegaConf.to_container(config, resolve=True), 
                mode='online' if config.wandb.enabled else 'disabled')
     wandb.config.run_dir = os.getcwd()
     save_path = os.path.join(os.getcwd(), '.hydra', 'config.yaml')

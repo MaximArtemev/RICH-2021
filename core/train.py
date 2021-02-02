@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 
 def setup_experiment(config):
-    os.environ["WANDB_API_KEY"] = wandb.api_key
+    os.environ["WANDB_API_KEY"] = config.wandb.api_key
     wandb.login()
     wandb.init(project=config.wandb.project_name,
                config=OmegaConf.to_container(config, resolve=True), 

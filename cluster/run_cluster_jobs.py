@@ -14,7 +14,8 @@ def main():
                 f"sbatch -t 15000 --gpus=1 -p normal -c 4 run_one_job.sh "
                 f"data.data_path=/home/martemev/Datasets/RICH-2021/ "
                 f"experiment.particle={particle} "
-                f"model.C.num_layers={num_layers} model.G.num_layers={num_layers}"
+                f"model.C.num_layers={num_layers} model.G.num_layers={num_layers} "
+                f"wandb.api_key=c26ec670e695fc64f8e21edaadfcdbb1ef590d6d"
             )
 
     batch_size = 20

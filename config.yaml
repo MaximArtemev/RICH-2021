@@ -53,4 +53,5 @@ utils:
 wandb:
   project_name: rich-2021
   enabled: True
+  api_key: ''
 

@@ -17,10 +17,10 @@ import logging
 from omegaconf import OmegaConf
 
 log = logging.getLogger(__name__)
-os.environ["WANDB_API_KEY"] = "c26ec670e695fc64f8e21edaadfcdbb1ef590d6d"
 
 
 def setup_experiment(config):
+    os.environ["WANDB_API_KEY"] = wandb.api_key
     wandb.login()
     wandb.init(project=config.wandb.project_name,
                config=OmegaConf.to_container(config, resolve=True), 
@@ -130,7 +130,7 @@ def train(gpu_num_if_use_ddp, config):
                                  kde=False, bins=100, ax=ax, label="generated", norm_hist=True)
                     ax.legend()
                     ax.set_title(dll_columns[particle_type])
-                wandb.log({"hist/weighted_comparison": plt})
+                wandb.log({"hist/weighted_comparison": wandb.Image(plt)})
                 plt.clf()
 
         if (epoch + 1) % config.utils.eval_interval == 0 and main_node:

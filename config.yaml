@@ -31,6 +31,7 @@ experiment:
     context_dim: 3
     data_dim: 5
   weights:
+    n_quantiles: 0
     positive: False
     enable: True
   checkpoint_path: '.'

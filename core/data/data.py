@@ -13,25 +13,26 @@ import logging
 log = logging.getLogger(__name__)
 
 
+def get_scaler(n_quantiles):
+    if n_quantiles > 0:
+        return QuantileTransformer(n_quantiles=n_quantiles, output_distribution='normal', subsample=int(1e10))
+    else:
+        return StandardScaler()
+
+
 class DataHandler:
     def __init__(self, config):
         self.config = config
         self.scalers = {
-            'features': StandardScaler(),
-            'weights': StandardScaler()
+            'data': get_scaler(config.data.scaler.n_quantiles),
+            'context': get_scaler(config.data.scaler.n_quantiles),
+            'weight': get_scaler(config.experiment.weights.n_quantiles),
         }
 
-        if config.data.scaler.n_quantiles > 0:
-            self.scalers['features'] = QuantileTransformer(
-                n_quantiles=config.data.scaler.n_quantiles,
-                output_distribution='normal',
-                subsample=int(1e10)
-            )
-
         if self.config.experiment.weights.positive:
-            self.scalers['weights'] = MinMaxScaler()
+            self.scalers['weight'] = MinMaxScaler()
         if not self.config.experiment.weights.enable:
-            self.scalers['weights'] = NoneProcessor()
+            self.scalers['weight'] = NoneProcessor()
 
         if config.data.download:
             if not os.path.exists(config.data.data_path):
@@ -50,17 +51,27 @@ class DataHandler:
 
         table = np.array(get_particle_table(config.data.data_path, config.experiment.particle))
         train_table, val_table = train_test_split(table, test_size=self.config.data.val_size, random_state=42)
-        self.scalers['features'].fit(train_table[:, :-1])
-        self.scalers['weights'].fit(train_table[:, -1].reshape(-1, 1))
-        # todo assert weight on last col
+        self.scalers['data'].fit(train_table[:, :config.experiment.data.data_dim])
+        self.scalers['context'].fit(
+            train_table[:, config.experiment.data.data_dim:
+                           config.experiment.data.data_dim + config.experiment.data.context_dim]
+        )
+        self.scalers['weight'].fit(train_table[:, -1].reshape(-1, 1))
+        # todo assert weight on last col, mb add to config
 
         train_table = np.concatenate([
-            self.scalers['features'].transform(train_table[:, :-1]),
-            self.scalers['weights'].transform(train_table[:, -1].reshape(-1, 1))
+            self.scalers['data'].transform(train_table[:, :config.experiment.data.data_dim]),
+            self.scalers['context'].transform(
+                train_table[:, config.experiment.data.data_dim:
+                               config.experiment.data.data_dim + config.experiment.data.context_dim]),
+            self.scalers['weight'].transform(train_table[:, -1].reshape(-1, 1))
         ], axis=1)
         val_table = np.concatenate([
-            self.scalers['features'].transform(val_table[:, :-1]),
-            self.scalers['weights'].transform(val_table[:, -1].reshape(-1, 1))
+            self.scalers['data'].transform(val_table[:, :config.experiment.data.data_dim]),
+            self.scalers['context'].transform(
+                val_table[:, config.experiment.data.data_dim:
+                             config.experiment.data.data_dim + config.experiment.data.context_dim]),
+            self.scalers['weight'].transform(val_table[:, -1].reshape(-1, 1))
         ], axis=1)
 
         train_dataset = ParticleDataset(config, train_table)

@@ -68,6 +68,7 @@ def train(gpu_num_if_use_ddp, config):
         data, context, weight = batch
         sampled_data.append(data), sampled_context.append(context), sampled_weight.append(weight)
     sampled_data = torch.cat(sampled_data, dim=0).numpy()
+    inverted_sampled_data = data_handler.scalers['data'].inverse_transform(sampled_data)
     sampled_context = torch.cat(sampled_context, dim=0)
     sampled_weight = torch.cat(sampled_weight, dim=0).view(-1, 1).numpy()
 
@@ -118,9 +119,10 @@ def train(gpu_num_if_use_ddp, config):
                 for batch in val_dataloader:
                     data, context, weight = prepare_batch(batch)
                     generated_samples.append(trainer.model.generate(data, context).to('cpu'))
-                generated_samples = torch.cat(generated_samples, dim=0)
+                generated_samples = torch.cat(generated_samples, dim=0).numpy()
+                inverted_generated_samples = data_handler.scalers['data'].inverse_transform(generated_samples)
 
-                hist_kws = {'weights': data_handler.scalers['weights'].inverse_transform(sampled_weight).reshape(-1),
+                hist_kws = {'weights': data_handler.scalers['weight'].inverse_transform(sampled_weight).reshape(-1),
                             'alpha': 0.5}
 
                 fig, axes = plt.subplots(3, 2, figsize=(15, 15))
@@ -139,16 +141,12 @@ def train(gpu_num_if_use_ddp, config):
                 fig, axes = plt.subplots(3, 2, figsize=(15, 15))
                 for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
                     sns.distplot(
-                        data_handler.scalers['features'].inverse_transform(
-                            sampled_data[:, particle_type].reshape(1, -1)
-                        ).reshape(-1),
+                        inverted_sampled_data[:, particle_type].reshape(-1),
                         hist_kws=hist_kws,
                         kde=False, bins=100, ax=ax, label="real normalized data", norm_hist=True
                     )
                     sns.distplot(
-                        data_handler.scalers['features'].inverse_transform(
-                            generated_samples[:, particle_type].reshape(1, -1)
-                        ).reshape(-1),
+                        inverted_generated_samples[:, particle_type].reshape(-1),
                         hist_kws=hist_kws,
                         kde=False, bins=100, ax=ax, label="generated", norm_hist=True
                     )

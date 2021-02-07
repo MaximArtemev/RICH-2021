@@ -30,6 +30,9 @@ experiment:
   data:
     context_dim: 3
     data_dim: 5
+  weights:
+    positive: False
+    enable: True
   checkpoint_path: '.'
   grad_clip: 10
   epochs: 1000

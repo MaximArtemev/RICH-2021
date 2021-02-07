@@ -71,8 +71,6 @@ def train(gpu_num_if_use_ddp, config):
     sampled_context = torch.cat(sampled_context, dim=0)
     sampled_weight = torch.cat(sampled_weight, dim=0).view(-1, 1).numpy()
 
-    wandb.log({"hist/real": wandb.Histogram(sampled_data)})
-
     dll_columns = ['RichDLLe', 'RichDLLk', 'RichDLLmu', 'RichDLLp', 'RichDLLbt']
 
     for epoch in range(0, config.experiment.epochs):
@@ -82,6 +80,9 @@ def train(gpu_num_if_use_ddp, config):
             train_dataloader.loader.sampler.set_epoch(epoch)
         for iteration in tqdm(range(config.utils.epoch_iters), desc='train loop', leave=False, position=0):
             data, context, weight = prepare_batch(train_dataloader.get_next())
+            if not config.experiment.weights.enable:
+                weight = torch.ones(data.shape[0], device=data.device, dtype=torch.float)
+
             if iteration == 0:
                 print(f"First batch of epoch {epoch} with shapes:"
                       f" data {data.shape}, context {context.shape}, weight {weight.shape}"
@@ -118,19 +119,38 @@ def train(gpu_num_if_use_ddp, config):
                     data, context, weight = prepare_batch(batch)
                     generated_samples.append(trainer.model.generate(data, context).to('cpu'))
                 generated_samples = torch.cat(generated_samples, dim=0)
-                wandb.log({"hist/generated": wandb.Histogram(generated_samples)})
+
+                hist_kws = {'weights': data_handler.scalers['weights'].inverse_transform(sampled_weight).reshape(-1),
+                            'alpha': 0.5}
 
                 fig, axes = plt.subplots(3, 2, figsize=(15, 15))
                 for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
                     sns.distplot(sampled_data[:, particle_type].reshape(-1),
-                                 hist_kws={'weights': sampled_weight.reshape(-1), 'alpha': 0.5},
+                                 hist_kws=hist_kws,
                                  kde=False, bins=100, ax=ax, label="real normalized data", norm_hist=True)
                     sns.distplot(generated_samples[:, particle_type].reshape(-1),
-                                 hist_kws={'weights': sampled_weight.reshape(-1), 'alpha': 0.5},
+                                 hist_kws=hist_kws,
                                  kde=False, bins=100, ax=ax, label="generated", norm_hist=True)
                     ax.legend()
                     ax.set_title(dll_columns[particle_type])
-                wandb.log({"hist/weighted_comparison": wandb.Image(plt)})
+                wandb.log({"hist/normalized": wandb.Image(plt)})
+                plt.clf()
+
+                fig, axes = plt.subplots(3, 2, figsize=(15, 15))
+                for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
+                    sns.distplot(
+                        data_handler.scalers['features'].inverse_transform(sampled_data[:, particle_type]).reshape(-1),
+                        hist_kws=hist_kws,
+                        kde=False, bins=100, ax=ax, label="real normalized data", norm_hist=True
+                    )
+                    sns.distplot(
+                        data_handler.scalers['features'].inverse_transform(generated_samples[:, particle_type]).reshape(-1),
+                        hist_kws=hist_kws,
+                        kde=False, bins=100, ax=ax, label="generated", norm_hist=True
+                    )
+                    ax.legend()
+                    ax.set_title(dll_columns[particle_type])
+                wandb.log({"hist/unnormalized": wandb.Image(plt)})
                 plt.clf()
 
         if (epoch + 1) % config.utils.eval_interval == 0 and main_node:

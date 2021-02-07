@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 dll_columns = ['RichDLLe', 'RichDLLk', 'RichDLLmu', 'RichDLLp', 'RichDLLbt']
 raw_feature_columns = ['Brunel_P', 'Brunel_ETA', 'nTracks_Brunel']
@@ -25,3 +26,14 @@ def get_particle_table(data_path, particle):
         particle_csv.append(table)
     particle_csv = pd.concat(particle_csv, axis=0, ignore_index=True)
     return particle_csv
+
+
+class NoneProcessor(StandardScaler):
+    def fit(self, X, y=None):
+        pass
+
+    def transform(self, X, copy=None):
+        return X
+
+    def inverse_transform(self, X, copy=None):
+        return X

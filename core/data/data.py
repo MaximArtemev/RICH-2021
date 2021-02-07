@@ -1,13 +1,13 @@
 import os
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from sklearn.preprocessing import QuantileTransformer, StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 import torch.utils.data as data
 
 from .datasets import ParticleDataset
-from .utils import get_particle_table
+from .utils import get_particle_table, NoneProcessor
 import logging
 
 log = logging.getLogger(__name__)
@@ -16,15 +16,22 @@ log = logging.getLogger(__name__)
 class DataHandler:
     def __init__(self, config):
         self.config = config
+        self.scalers = {
+            'features': StandardScaler(),
+            'weights': StandardScaler()
+        }
 
         if config.data.scaler.n_quantiles > 0:
-            self.scaler = QuantileTransformer(
+            self.scalers['features'] = QuantileTransformer(
                 n_quantiles=config.data.scaler.n_quantiles,
                 output_distribution='normal',
                 subsample=int(1e10)
             )
-        else:
-            self.scaler = StandardScaler()
+
+        if self.config.experiment.weights.positive:
+            self.scalers['weights'] = MinMaxScaler()
+        if not self.config.experiment.weights.enable:
+            self.scalers['weights'] = NoneProcessor()
 
         if config.data.download:
             if not os.path.exists(config.data.data_path):
@@ -43,11 +50,18 @@ class DataHandler:
 
         table = np.array(get_particle_table(config.data.data_path, config.experiment.particle))
         train_table, val_table = train_test_split(table, test_size=self.config.data.val_size, random_state=42)
-        self.scaler.fit(train_table[:, :-1]) # without the weights
+        self.scalers['features'].fit(train_table[:, :-1])
+        self.scalers['weights'].fit(train_table[:, -1].reshape(-1, 1))
         # todo assert weight on last col
 
-        train_table = np.concatenate([self.scaler.transform(train_table[:, :-1]), train_table[:, -1].reshape(-1, 1)], axis=1)
-        val_table = np.concatenate([self.scaler.transform(val_table[:, :-1]), val_table[:, -1].reshape(-1, 1)], axis=1)
+        train_table = np.concatenate([
+            self.scalers['features'].transform(train_table[:, :-1]),
+            self.scalers['weights'].transform(train_table[:, -1].reshape(-1, 1))
+        ], axis=1)
+        val_table = np.concatenate([
+            self.scalers['features'].transform(val_table[:, :-1]),
+            self.scalers['weights'].transform(val_table[:, -1].reshape(-1, 1))
+        ], axis=1)
 
         train_dataset = ParticleDataset(config, train_table)
         self.train_loader = data.DataLoader(

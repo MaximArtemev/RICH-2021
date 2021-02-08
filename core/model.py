@@ -25,8 +25,6 @@ class RICHGAN(torch.nn.Module):
             return self.trainC(*args, **kwargs)
 
     def trainC(self, data, context, weight, mode='train'):
-        self.C.train()
-        self.G.eval()
         losses = {}
 
         data_fake = self.G(data, context)
@@ -39,8 +37,6 @@ class RICHGAN(torch.nn.Module):
         return self.lw.visualize_losses(losses, mode)
 
     def trainG(self, data, context, weight, mode='train'):
-        self.C.eval()
-        self.G.train()
         losses = {}
 
         data_fake = self.G(data, context)

@@ -1,15 +1,14 @@
-import torch
+from torch.utils.data import Dataset
 import logging
+
+from .transformer import DataScaler
 
 log = logging.getLogger(__name__)
 
 
-class ParticleDataset(torch.utils.data.Dataset):
+class ParticleDataset(Dataset):
     def __init__(self, config, table):
-        self.data = table[:, :config.experiment.data.data_dim]
-        self.context = table[:, config.experiment.data.data_dim:
-                                     config.experiment.data.data_dim + config.experiment.data.context_dim]
-        self.weight = table[:, -1]
+        self.data, self.context, self.weight = DataScaler._split_table(table, config)
         assert config.experiment.data.data_dim + config.experiment.data.context_dim + 1 == table.shape[1]
 
     def __len__(self):

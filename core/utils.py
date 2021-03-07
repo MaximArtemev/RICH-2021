@@ -56,15 +56,3 @@ class InfiniteDataloader:
         except StopIteration:
             self.iter = iter(self.loader)
             return self.get_next()
-
-
-class DDPWrapper(torch.nn.Module):
-    def __init__(self, module):
-        super().__init__()
-        self.module = module
-
-    def forward(self, *args, **kwargs):
-        return self.module.module.forward(*args, **kwargs)
-
-    def generate(self, *args, **kwargs):
-        return self.module.module.generate(*args, **kwargs)

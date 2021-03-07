@@ -45,14 +45,7 @@ def main(config):
     prepare_dirs()
     prepare_config(config)
 
-    if config.utils.use_ddp:
-        world_size = torch.cuda.device_count()
-        config.experiment.lr.C = config.experiment.lr.C * torch.cuda.device_count()
-        config.experiment.lr.G = config.experiment.lr.G * torch.cuda.device_count()
-
-        torch.multiprocessing.spawn(train, nprocs=world_size, args=(config,))
-    else:
-        train(None, config)
+    train(config)
 
 
 if __name__ == '__main__':

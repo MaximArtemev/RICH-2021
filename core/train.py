@@ -30,20 +30,8 @@ def setup_experiment(config):
     wandb.save(save_path)
 
 
-def train(gpu_num_if_use_ddp, config):
-    if config.utils.use_ddp:
-        dist.init_process_group(
-            backend="nccl",
-            init_method="tcp://127.0.0.1:4433",
-            world_size=torch.cuda.device_count(),
-            rank=gpu_num_if_use_ddp,
-        )
-        config.utils.device = f'cuda:{gpu_num_if_use_ddp}'
-        main_node = gpu_num_if_use_ddp == 0
-    else:
-        main_node = True
-    if main_node:
-        setup_experiment(config)
+def train(config):
+    setup_experiment(config)
     data_handler = DataHandler(config)
     train_dataloader, val_dataloader = data_handler.train_loader, data_handler.val_loader
     train_dataloader = InfiniteDataloader(train_dataloader)
@@ -68,7 +56,7 @@ def train(gpu_num_if_use_ddp, config):
         data, context, weight = batch
         sampled_data.append(data), sampled_context.append(context), sampled_weight.append(weight)
     sampled_data = torch.cat(sampled_data, dim=0).numpy()
-    inverted_sampled_data = data_handler.scalers['data'].inverse_transform(sampled_data)
+    inverted_sampled_data = data_handler.scaler.scalers['data'].inverse_transform(sampled_data)
     sampled_context = torch.cat(sampled_context, dim=0)
     sampled_weight = torch.cat(sampled_weight, dim=0).view(-1, 1).numpy()
 
@@ -77,12 +65,8 @@ def train(gpu_num_if_use_ddp, config):
     for epoch in range(0, config.experiment.epochs):
         log.info(f"Epoch {epoch} started")
         trainer.model.train()
-        if config.utils.use_ddp:
-            train_dataloader.loader.sampler.set_epoch(epoch)
         for iteration in tqdm(range(config.utils.epoch_iters), desc='train loop', leave=False, position=0):
             data, context, weight = prepare_batch(train_dataloader.get_next())
-            if not config.experiment.weights.enable:
-                weight = torch.ones(data.shape[0], device=data.device, dtype=torch.float)
 
             if iteration == 0:
                 print(f"First batch of epoch {epoch} with shapes:"
@@ -97,13 +81,13 @@ def train(gpu_num_if_use_ddp, config):
             trainer.train('C', data, context, weight)
             trainer.train('G', data, context, weight)
             # logging metrics every N iterations to save some time on uploads
-            if (iteration + 1) % config.utils.log_iter_interval == 0 and main_node:
+            if (iteration + 1) % config.utils.log_iter_interval == 0:
                 trainer.model.eval()
                 wandb.log(trainer.evaluate('C', data, context, weight, tag='training'))
                 wandb.log(trainer.evaluate('G', data, context, weight, tag='training'))
                 trainer.model.train()
 
-        if (epoch + 1) % config.utils.save_interval == 0 and main_node:
+        if (epoch + 1) % config.utils.save_interval == 0:
             save_path = os.path.join(os.getcwd(), 'checkpoint', 'weights.{:d}.pth'.format(epoch))
             trainer.save(save_path)
             wandb.save(save_path)
@@ -112,7 +96,7 @@ def train(gpu_num_if_use_ddp, config):
             # wandb.log({'checkpoint/FID': checkpoint_fid})
             # todo add metrics
 
-        if (epoch + 1) % config.utils.sample_interval == 0 and main_node:
+        if (epoch + 1) % config.utils.sample_interval == 0:
             trainer.model.eval()
             with torch.no_grad():
                 generated_samples = []
@@ -120,23 +104,12 @@ def train(gpu_num_if_use_ddp, config):
                     data, context, weight = prepare_batch(batch)
                     generated_samples.append(trainer.model.generate(data, context).to('cpu'))
                 generated_samples = torch.cat(generated_samples, dim=0).numpy()
-                inverted_generated_samples = data_handler.scalers['data'].inverse_transform(generated_samples)
+                inverted_generated_samples = data_handler.scaler.scalers['data'].inverse_transform(generated_samples)
 
-                hist_kws = {'weights': data_handler.scalers['weight'].inverse_transform(sampled_weight).reshape(-1),
-                            'alpha': 0.5}
-
-                fig, axes = plt.subplots(3, 2, figsize=(15, 15))
-                for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
-                    sns.distplot(sampled_data[:, particle_type].reshape(-1),
-                                 hist_kws=hist_kws,
-                                 kde=False, bins=100, ax=ax, label="real normalized data", norm_hist=True)
-                    sns.distplot(generated_samples[:, particle_type].reshape(-1),
-                                 hist_kws=hist_kws,
-                                 kde=False, bins=100, ax=ax, label="generated", norm_hist=True)
-                    ax.legend()
-                    ax.set_title(dll_columns[particle_type])
-                wandb.log({"hist/normalized": wandb.Image(plt)})
-                plt.clf()
+                hist_kws = {
+                    'weights': data_handler.scaler.scalers['weight'].inverse_transform(sampled_weight).reshape(-1),
+                    'alpha': 0.5
+                }
 
                 fig, axes = plt.subplots(3, 2, figsize=(15, 15))
                 for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
@@ -148,14 +121,36 @@ def train(gpu_num_if_use_ddp, config):
                     sns.distplot(
                         inverted_generated_samples[:, particle_type].reshape(-1),
                         hist_kws=hist_kws,
-                        kde=False, bins=100, ax=ax, label="generated", norm_hist=True
+                        kde=True, bins=100, ax=ax, label="generated", norm_hist=True
                     )
                     ax.legend()
                     ax.set_title(dll_columns[particle_type])
-                wandb.log({"hist/unnormalized": wandb.Image(plt)})
+                wandb.log({"hist/real-weighted": wandb.Image(plt)})
                 plt.clf()
 
-        if (epoch + 1) % config.utils.eval_interval == 0 and main_node:
+                hist_kws = {
+                    'weights': np.ones_like(sampled_weight).reshape(-1),
+                    'alpha': 0.5
+                }
+
+                fig, axes = plt.subplots(3, 2, figsize=(15, 15))
+                for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
+                    sns.distplot(
+                        inverted_sampled_data[:, particle_type].reshape(-1),
+                        hist_kws=hist_kws,
+                        kde=False, bins=100, ax=ax, label="real normalized data", norm_hist=True
+                    )
+                    sns.distplot(
+                        inverted_generated_samples[:, particle_type].reshape(-1),
+                        hist_kws=hist_kws,
+                        kde=True, bins=100, ax=ax, label="generated", norm_hist=True
+                    )
+                    ax.legend()
+                    ax.set_title(dll_columns[particle_type])
+                wandb.log({"hist/real-unweighted": wandb.Image(plt)})
+                plt.clf()
+
+        if (epoch + 1) % config.utils.eval_interval == 0:
             lossD, lossG = [], []
             trainer.model.eval()
             for batch in tqdm(val_dataloader, desc='val_loop', leave=False, position=0):

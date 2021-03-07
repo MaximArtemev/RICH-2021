@@ -33,7 +33,7 @@ experiment:
   weights:
     n_quantiles: 0
     positive: False
-    enable: True
+    enable: False
   checkpoint_path: '.'
   grad_clip: 10
   epochs: 1000
@@ -44,7 +44,6 @@ experiment:
 
 
 utils:
-  use_ddp: 0
   device: "cuda:0"
   num_workers: 0
   save_interval: 50

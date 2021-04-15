@@ -1,12 +1,11 @@
-"""Network components."""
-
+import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
 from .utils import NoneLayer
 
 
-def get_normalization_1d(norm_type, features):
+def get_normalization_1d(norm_type: str, features: int):
     if norm_type == 'bn':
         return nn.BatchNorm1d(features)
     if norm_type == 'in':
@@ -20,7 +19,12 @@ def get_normalization_1d(norm_type, features):
 
 
 class LinearBlock(nn.Module):
-    def __init__(self, in_dim, out_dim, normalization, use_spectral, bias=False):
+    def __init__(self,
+                 in_dim: int,
+                 out_dim: int,
+                 normalization: str,
+                 use_spectral: bool,
+                 bias: bool = False) -> None:
         super().__init__()
         self.module = nn.Linear(in_dim, out_dim, bias=bias)
         if use_spectral:
@@ -30,7 +34,7 @@ class LinearBlock(nn.Module):
             nn.LeakyReLU(0.05)
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.module(x)
         x = self.block(x)
         return x

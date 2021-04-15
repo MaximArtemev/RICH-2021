@@ -1,5 +1,9 @@
 import torch
 import torch.nn as nn
+from torchtyping import TensorType
+from typeguard import typechecked
+from core.utils import DataTensorType, ContextTensorType, WeightTensorType
+from omegaconf.dictconfig import DictConfig
 
 from core.nn import LinearBlock
 
@@ -9,12 +13,12 @@ log = logging.getLogger(__name__)
 
 
 class Critic(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: DictConfig) -> None:
         super(Critic, self).__init__()
         self.config = config
         self.layers = self._build_layers()
 
-    def _build_layers(self):
+    def _build_layers(self) -> nn.ModuleList:
         layers = []
 
         for layer_index in range(self.config.model.C.num_layers):
@@ -30,7 +34,10 @@ class Critic(nn.Module):
             )
         return nn.ModuleList(layers)
 
-    def forward(self, x, context):
+    @typechecked()
+    def forward(self,
+                x: DataTensorType,
+                context: ContextTensorType) -> TensorType['batch', -1]:
         x = torch.cat([x.float(), context.float()], dim=1)
         for layer in self.layers:
             x = layer(x)

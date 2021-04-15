@@ -1,18 +1,28 @@
 import torch
+from omegaconf.dictconfig import DictConfig
+from torchtyping import TensorType
+from core.utils import DataTensorType, WeightTensorType, ContextTensorType
+from typeguard import typechecked
+from typing import Dict
 
 import torch.optim as optim
 from .model import RICHGAN
 
 
 class Trainer:
-    def __init__(self, config):
+    def __init__(self, config: DictConfig) -> None:
         self.config = config
         self.model = RICHGAN(config).to(config.utils.device)
         self.optim = {'G': optim.Adam(self.model.G.parameters(), lr=config.experiment.lr.G, betas=(0.5, 0.9)),
                       'C': optim.Adam(self.model.C.parameters(), lr=config.experiment.lr.C, betas=(0.5, 0.9))}
         self.names = {'G': self.model.G, 'C': self.model.C}
 
-    def train(self, module, data, context, weight):
+    @typechecked
+    def train(self,
+              module: str,
+              data: DataTensorType,
+              context: ContextTensorType,
+              weight: WeightTensorType) -> float:
         self.optim[module].zero_grad()
         loss = self.model(module, data, context, weight, mode='train')
         loss.backward()
@@ -21,10 +31,16 @@ class Trainer:
         self.optim[module].step()
         return loss.item()
 
-    def evaluate(self, module, data, context, weight, tag='training'):
+    @typechecked
+    def evaluate(self,
+                 module: str,
+                 data: DataTensorType,
+                 context: ContextTensorType,
+                 weight: WeightTensorType,
+                 tag: str = 'training') -> Dict[str, float]:
         return self.model(module, data, context, weight, mode=tag)
 
-    def save(self, path):
+    def save(self, path: str) -> None:
         states = {
             'G.model': self.model.G.state_dict(),
             'C.model': self.model.C.state_dict(),
@@ -33,7 +49,7 @@ class Trainer:
         }
         torch.save(states, path)
 
-    def load(self, path):
+    def load(self, path: str) -> None:
         states = torch.load(path, map_location=lambda storage, loc: storage)
         if 'G.model' in states:
             self.model.G.load_state_dict(states['G.model'])

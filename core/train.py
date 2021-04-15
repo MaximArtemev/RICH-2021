@@ -3,9 +3,13 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from omegaconf.dictconfig import DictConfig
+from typing import List, Tuple
+from torchtyping import TensorType, patch_typeguard
+from core.utils import DataTensorType, WeightTensorType, ContextTensorType
+from typeguard import typechecked
 
 import torch
-import torch.distributed as dist
 import wandb
 
 from core.data import DataHandler
@@ -13,13 +17,15 @@ from core.utils import InfiniteDataloader
 from core.trainer import Trainer
 # from core.metrics import calculate_fid
 # todo add fid
+
 import logging
 from omegaconf import OmegaConf
 
 log = logging.getLogger(__name__)
+patch_typeguard()
 
 
-def setup_experiment(config):
+def setup_experiment(config: DictConfig) -> None:
     os.environ["WANDB_API_KEY"] = config.wandb.api_key
     wandb.login()
     wandb.init(project=config.wandb.project_name,
@@ -30,7 +36,7 @@ def setup_experiment(config):
     wandb.save(save_path)
 
 
-def train(config):
+def train(config: DictConfig) -> None:
     setup_experiment(config)
     data_handler = DataHandler(config)
     train_dataloader, val_dataloader = data_handler.train_loader, data_handler.val_loader
@@ -69,15 +75,10 @@ def train(config):
             data, context, weight = prepare_batch(train_dataloader.get_next())
 
             if iteration == 0:
-                print(f"First batch of epoch {epoch} with shapes:"
-                      f" data {data.shape}, context {context.shape}, weight {weight.shape}"
-                      f" Working on {config.utils.device}")
-                print(f"First batch of epoch {epoch} with means:"
-                      f" image {data.mean()}, context {context.mean()}, weight {weight.mean()}"
-                      f" Working on {config.utils.device}")
-                print(f"First batch of epoch {epoch} with stds:"
-                      f" image {data.std()}, context {context.std()}, weight {weight.std()}"
-                      f" Working on {config.utils.device}")
+                log.info(f"First batch of epoch {epoch} with:"
+                         f" shapes: {data.shape}, {context.shape}, {weight.shape}"
+                         f" means: {data.mean()}, {context.mean()}, {weight.mean()}"
+                         f" stds: {data.std()}, {context.std()}, {weight.std()}")
             trainer.train('C', data, context, weight)
             trainer.train('G', data, context, weight)
             # logging metrics every N iterations to save some time on uploads
@@ -153,7 +154,9 @@ def train(config):
         if (epoch + 1) % config.utils.eval_interval == 0:
             lossD, lossG = [], []
             trainer.model.eval()
-            for batch in tqdm(val_dataloader, desc='val_loop', leave=False, position=0):
+            for batch_ind, batch in enumerate(tqdm(val_dataloader, desc='val_loop', leave=False, position=0)):
+                if batch_ind > config.utils.epoch_iters:
+                    break
                 data, context, weight = prepare_batch(batch)
                 with torch.no_grad():
                     lossD.append(trainer.evaluate('C', data, context, weight, tag='evaluation'))

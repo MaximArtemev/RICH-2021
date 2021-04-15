@@ -3,18 +3,18 @@ import os
 from core.train import train
 import hydra
 import logging
-import torch
+from omegaconf.dictconfig import DictConfig
 
-import warnings
-warnings.filterwarnings("ignore")
 
 log = logging.getLogger(__name__)
 
 CONFIG_PATH = "config.yaml"
 
 
-def prepare_config(config):
-    # modifying path to data
+def prepare_config(config: DictConfig) -> None:
+
+    assert config.experiment.particle, "Specify particle str"
+
     if not os.path.isabs(config.data.data_path):
         config.data.data_path = os.path.join(hydra.utils.get_original_cwd(),
                                              config.data.data_path)
@@ -27,18 +27,16 @@ def prepare_config(config):
         log.debug(f"config.experiment.checkpoint_path modified to {config.experiment.checkpoint_path}")
 
 
-def prepare_dirs():
+def prepare_dirs() -> None:
     # since hydra will run script in a new subfolder it is necessary to create dirs
     os.makedirs(join(os.getcwd(), 'checkpoint'), exist_ok=True)
-    os.makedirs(join(os.getcwd(), 'sample_training'), exist_ok=True)
-    os.makedirs(join(os.getcwd(), 'sample_masks'), exist_ok=True)
-    log.debug("Created checkpoint, sample_training dirs")
+    log.debug("Created checkpoint dir")
 
 
 # decorator allows hydra to load and parse config
 # additionally, hydra will setup a global logger
 @hydra.main(config_path=CONFIG_PATH)
-def main(config):
+def main(config: DictConfig) -> None:
     log.info(config.pretty())
     log.info("Current working directory  : {}".format(os.getcwd()))
 

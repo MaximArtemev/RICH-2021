@@ -1,24 +1,26 @@
 data:
-  data_path: "/home/mrartemev/Datasets/HEP/RICH-2021/"
+  data_path: "/Users/max/Downloads/HEP/RICH-2021/"
   val_size: 0.1
   download: False
   scaler:
-    n_quantiles: 100000
+    n_quantiles: 0
 
 model:
   G:
-    noise_dim: 128
-    fc_dim: 128
-    num_layers: 10
+    noise_dim: 256
+    fc_dim: 256
+    num_layers: 5
     normalization: 'bn' # ln, gn, in, bn
-    use_spectral: 1
+    use_spectral: True
   C:
-    fc_dim: 128
-    num_layers: 10
-    normalization: 'ln' # ln, gn, in, bn
-    use_spectral: 1
+    fc_dim: 256
+    num_layers: 5
+    normalization: 'in' # ln, gn, in, bn
+    use_spectral: True
 
 losses:
+  adv_type: 'wgan' # wgan, lsgan, cramergan, jsgan
+  use_gp: True
   G:
     adversarial: 1
   C:
@@ -26,21 +28,21 @@ losses:
     gradient_penalty: 10
 
 experiment:
-  particle: 'none' # specify for each run
+  particle: '' # specify for each run
   data:
     context_dim: 3
     data_dim: 5
   weights:
-    n_quantiles: 0
+    n_quantiles: -1
     positive: False
-    enable: False
+    enable: True
   checkpoint_path: '.'
   grad_clip: 10
   epochs: 1000
   batch_size: 2048
   lr:
-    G: 0.0001
-    C: 0.0005
+    G: 0.001
+    C: 0.005
 
 
 utils:
@@ -51,7 +53,6 @@ utils:
   eval_interval: 5
   log_iter_interval: 50
   epoch_iters: 1000
-  tags: ''
 
 wandb:
   project_name: rich-2021

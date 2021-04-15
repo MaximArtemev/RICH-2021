@@ -1,7 +1,9 @@
-"""HairRecolorGAN, generator, and discriminator."""
-
 import torch
 import torch.nn as nn
+from torchtyping import TensorType
+from typeguard import typechecked
+from core.utils import DataTensorType, ContextTensorType, WeightTensorType
+from omegaconf.dictconfig import DictConfig
 
 from core.nn import LinearBlock
 import logging
@@ -10,15 +12,16 @@ log = logging.getLogger(__name__)
 
 
 class Generator(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: DictConfig) -> None:
         super(Generator, self).__init__()
         self.config = config
         self.layers = self._build_layers()
 
-    def _sample_latent(self, x):
+    @typechecked()
+    def _sample_latent(self, x: TensorType['batch', -1]):
         return torch.randn(x.shape[0], self.config.model.G.noise_dim, device=self.config.utils.device)
 
-    def _build_layers(self):
+    def _build_layers(self) -> nn.ModuleList:
         layers = []
 
         for layer_index in range(self.config.model.G.num_layers):
@@ -34,12 +37,12 @@ class Generator(nn.Module):
             )
         return nn.ModuleList(layers)
 
-    def forward(self, x, context):
+    @typechecked()
+    def forward(self,
+                x: DataTensorType,
+                context: ContextTensorType) -> DataTensorType:
         noise = self._sample_latent(x)
-        # todo add reduce_noise
         x = torch.cat([noise.float(), context.float()], dim=1)
         for layer in self.layers:
             x = layer(x)
         return x
-
-# todo add perceptual features

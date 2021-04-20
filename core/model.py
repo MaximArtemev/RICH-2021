@@ -38,7 +38,7 @@ class RICHGAN(torch.nn.Module):
                mode: str = 'train'):
         losses = {}
 
-        data_fake = self.G(data, context)
+        data_fake = self.G(data, context).detach()
 
         if self.config.losses.adv_type == 'jsgan':
             losses['C.adversarial'] = critic_jsgan_loss(self.C, data, data_fake, context, weight)

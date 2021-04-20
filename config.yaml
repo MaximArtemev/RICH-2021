@@ -45,7 +45,6 @@ experiment:
     C: 0.005
 
 metric:
-  max_elements: 1000000
   ks:
     bins: 20
   efficiency:
@@ -54,9 +53,9 @@ metric:
     thresholds: [0.05,0.10,0.25,0.50,0.75,0.90,0.95]
   classification:
     split_size: 0.5
-    iterations: 500
+    iterations: 5000
     verbose_each_iter: 1000 # 0 for no output
-    depth: 5
+    depth: 7
 
 
 

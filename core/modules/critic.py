@@ -32,6 +32,7 @@ class Critic(nn.Module):
                     use_spectral=self.config.model.G.use_spectral
                 )
             )
+        layers[-1] = layers[-1].module
         return nn.ModuleList(layers)
 
     @typechecked()

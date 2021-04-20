@@ -1,13 +1,13 @@
+import matplotlib as mpl
+mpl.use("Agg")
+import matplotlib.pyplot as plt
+
 import os
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import seaborn as sns
 from omegaconf.dictconfig import DictConfig
-from typing import List, Tuple
-from torchtyping import TensorType, patch_typeguard
-from core.utils import DataTensorType, WeightTensorType, ContextTensorType
-from typeguard import typechecked
+from torchtyping import patch_typeguard
 
 import torch
 import wandb
@@ -15,8 +15,8 @@ import wandb
 from core.data import DataHandler
 from core.utils import InfiniteDataloader
 from core.trainer import Trainer
-# from core.metrics import calculate_fid
-# todo add fid
+from core.metrics import make_figures, plot_1d_hist, weighted_ks, calculate_rocauc
+from core.data import raw_feature_columns, dll_columns
 
 import logging
 from omegaconf import OmegaConf
@@ -29,7 +29,7 @@ def setup_experiment(config: DictConfig) -> None:
     os.environ["WANDB_API_KEY"] = config.wandb.api_key
     wandb.login()
     wandb.init(project=config.wandb.project_name,
-               config=OmegaConf.to_container(config, resolve=True), 
+               config=OmegaConf.to_container(config, resolve=True),
                mode='online' if config.wandb.enabled else 'disabled')
     wandb.config.run_dir = os.getcwd()
     save_path = os.path.join(os.getcwd(), '.hydra', 'config.yaml')
@@ -52,8 +52,8 @@ def train(config: DictConfig) -> None:
 
     def prepare_batch(batch):
         data, context, weight = batch
-        data, context, weight = data.to(config.utils.device),\
-                                context.to(config.utils.device),\
+        data, context, weight = data.to(config.utils.device), \
+                                context.to(config.utils.device), \
                                 weight.to(config.utils.device)
         return data, context, weight
 
@@ -61,12 +61,15 @@ def train(config: DictConfig) -> None:
     for batch in val_dataloader:
         data, context, weight = batch
         sampled_data.append(data), sampled_context.append(context), sampled_weight.append(weight)
+
     sampled_data = torch.cat(sampled_data, dim=0).numpy()
     inverted_sampled_data = data_handler.scaler.scalers['data'].inverse_transform(sampled_data)
-    sampled_context = torch.cat(sampled_context, dim=0)
-    sampled_weight = torch.cat(sampled_weight, dim=0).view(-1, 1).numpy()
 
-    dll_columns = ['RichDLLe', 'RichDLLk', 'RichDLLmu', 'RichDLLp', 'RichDLLbt']
+    sampled_context = torch.cat(sampled_context, dim=0)
+    inverted_sampled_context = data_handler.scaler.scalers['context'].inverse_transform(sampled_context)
+
+    sampled_weight = torch.cat(sampled_weight, dim=0).view(-1, 1).numpy()
+    inverted_sampled_weight = data_handler.scaler.scalers['weight'].inverse_transform(sampled_weight).reshape(-1)
 
     for epoch in range(0, config.experiment.epochs):
         log.info(f"Epoch {epoch} started")
@@ -79,8 +82,8 @@ def train(config: DictConfig) -> None:
                          f" shapes: {data.shape}, {context.shape}, {weight.shape}"
                          f" means: {data.mean()}, {context.mean()}, {weight.mean()}"
                          f" stds: {data.std()}, {context.std()}, {weight.std()}")
-            trainer.train('C', data, context, weight)
-            trainer.train('G', data, context, weight)
+            # trainer.train('C', data, context, weight)
+            # trainer.train('G', data, context, weight)
             # logging metrics every N iterations to save some time on uploads
             if (iteration + 1) % config.utils.log_iter_interval == 0:
                 trainer.model.eval()
@@ -89,16 +92,13 @@ def train(config: DictConfig) -> None:
                 trainer.model.train()
 
         if (epoch + 1) % config.utils.save_interval == 0:
+            trainer.model.eval()
+
             save_path = os.path.join(os.getcwd(), 'checkpoint', 'weights.{:d}.pth'.format(epoch))
             trainer.save(save_path)
             wandb.save(save_path)
             log.info(f"Checkpointed to {os.path.join(os.getcwd(), 'checkpoint', 'weights.{:d}.pth'.format(epoch))}")
-            # checkpoint_fid = calculate_fid(config, trainer.model, val_dataloader, dims=2048)
-            # wandb.log({'checkpoint/FID': checkpoint_fid})
-            # todo add metrics
 
-        if (epoch + 1) % config.utils.sample_interval == 0:
-            trainer.model.eval()
             with torch.no_grad():
                 generated_samples = []
                 for batch in val_dataloader:
@@ -107,49 +107,43 @@ def train(config: DictConfig) -> None:
                 generated_samples = torch.cat(generated_samples, dim=0).numpy()
                 inverted_generated_samples = data_handler.scaler.scalers['data'].inverse_transform(generated_samples)
 
-                hist_kws = {
-                    'weights': data_handler.scaler.scalers['weight'].inverse_transform(sampled_weight).reshape(-1),
-                    'alpha': 0.5
-                }
+            # make_figures, plot_1d_hist, weighted_ks, calculate_rocauc
+            data_df = pd.DataFrame(inverted_sampled_data, columns=dll_columns)
+            gen_df = pd.DataFrame(inverted_generated_samples, columns=dll_columns)
+            context_df = pd.DataFrame(inverted_sampled_context, columns=raw_feature_columns)
 
-                fig, axes = plt.subplots(3, 2, figsize=(15, 15))
-                for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
-                    sns.distplot(
-                        inverted_sampled_data[:, particle_type].reshape(-1),
-                        hist_kws=hist_kws,
-                        kde=False, bins=100, ax=ax, label="real normalized data", norm_hist=True
+            weighted, unweighted = calculate_rocauc(config, context_df, data_df, gen_df, inverted_sampled_weight)
+            results_avg, results_max = weighted_ks(config, data_df, gen_df, context_df, inverted_sampled_weight)
+            ks_avg = results_avg.mean().mean()
+            ks_max = results_max.max().max()
+
+            wandb.log({
+                "checkpoint/hist/weighted": wandb.Image(
+                    plot_1d_hist(
+                        inverted_sampled_data, inverted_generated_samples,
+                        {'weights': inverted_sampled_weight,
+                         'alpha': 0.5}
                     )
-                    sns.distplot(
-                        inverted_generated_samples[:, particle_type].reshape(-1),
-                        hist_kws=hist_kws,
-                        kde=True, bins=100, ax=ax, label="generated", norm_hist=True
+                ),
+                "checkpoint/hist/unweighted": wandb.Image(
+                    plot_1d_hist(
+                        inverted_sampled_data, inverted_generated_samples,
+                        {'weights': np.ones_like(sampled_weight),
+                         'alpha': 0.5}
                     )
-                    ax.legend()
-                    ax.set_title(dll_columns[particle_type])
-                wandb.log({"hist/real-weighted": wandb.Image(plt)})
+                ),
+                'checkpoint/rocauc/weighted': weighted,
+                'checkpoint/rocauc/unweighted': unweighted,
+                'checkpoint/ks/avg': ks_avg,
+                'checkpoint/ks/max': ks_max
+            })
+
+            for name, fig in make_figures(config, context_df, data_df, gen_df, inverted_sampled_weight):
+                wandb.log({name: plt})
                 plt.clf()
 
-                hist_kws = {
-                    'weights': np.ones_like(sampled_weight).reshape(-1),
-                    'alpha': 0.5
-                }
-
-                fig, axes = plt.subplots(3, 2, figsize=(15, 15))
-                for particle_type, ax in zip((0, 1, 2, 3, 4), axes.flatten()):
-                    sns.distplot(
-                        inverted_sampled_data[:, particle_type].reshape(-1),
-                        hist_kws=hist_kws,
-                        kde=False, bins=100, ax=ax, label="real normalized data", norm_hist=True
-                    )
-                    sns.distplot(
-                        inverted_generated_samples[:, particle_type].reshape(-1),
-                        hist_kws=hist_kws,
-                        kde=True, bins=100, ax=ax, label="generated", norm_hist=True
-                    )
-                    ax.legend()
-                    ax.set_title(dll_columns[particle_type])
-                wandb.log({"hist/real-unweighted": wandb.Image(plt)})
-                plt.clf()
+            wandb.log({"checkpoint/ks/avg/table": wandb.Table(list(results_avg.columns), results_avg)})
+            wandb.log({"checkpoint/ks/max/table": wandb.Table(list(results_max.columns), results_max)})
 
         if (epoch + 1) % config.utils.eval_interval == 0:
             lossD, lossG = [], []
@@ -164,4 +158,5 @@ def train(config: DictConfig) -> None:
             wandb.log({key: np.mean([i[key] for i in lossD]) for key in lossD[0].keys()})
             wandb.log({key: np.mean([i[key] for i in lossG]) for key in lossG[0].keys()})
             log.info(f"Validation after epoch {epoch} finished")
+
     log.info("Training finished")

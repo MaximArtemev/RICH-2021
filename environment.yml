@@ -22,4 +22,5 @@ dependencies:
       - matplotlib
       - seaborn
       - torchtyping
+      - catboost
 prefix: /home/user/anaconda3/envs/rich2021

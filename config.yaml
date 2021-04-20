@@ -44,12 +44,26 @@ experiment:
     G: 0.001
     C: 0.005
 
+metric:
+  max_elements: 1000000
+  ks:
+    bins: 20
+  efficiency:
+    make_ratio: True
+    bins: 10
+    thresholds: [0.05,0.10,0.25,0.50,0.75,0.90,0.95]
+  classification:
+    split_size: 0.5
+    iterations: 500
+    verbose_each_iter: 1000 # 0 for no output
+    depth: 5
+
+
 
 utils:
   device: "cuda:0"
   num_workers: 0
-  save_interval: 50
-  sample_interval: 5
+  save_interval: 5
   eval_interval: 5
   log_iter_interval: 50
   epoch_iters: 1000

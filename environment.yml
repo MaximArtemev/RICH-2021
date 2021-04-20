@@ -5,7 +5,7 @@ channels:
 dependencies:
   - numpy
   - pip
-  - python=3.7
+  - python=3.8
   - pytorch=1.7
   - pip:
       - h5py
@@ -17,10 +17,11 @@ dependencies:
       - torchsummary
       - pandas
       - tqdm
-      - wandb
+      - wandb==0.10.18
       - hydra-core
-      - matplotlib
-      - seaborn
+      - matplotlib==3.2.2
+      - seaborn==0.10.1
       - torchtyping
       - catboost
+      - plotly==4.14
 prefix: /home/user/anaconda3/envs/rich2021

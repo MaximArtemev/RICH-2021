@@ -24,4 +24,5 @@ dependencies:
       - torchtyping
       - catboost
       - plotly==4.14
+      - pillow
 prefix: /home/user/anaconda3/envs/rich2021

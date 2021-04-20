@@ -139,7 +139,7 @@ def train(config: DictConfig) -> None:
             })
 
             for name, fig in make_figures(config, context_df, data_df, gen_df, inverted_sampled_weight):
-                wandb.log({name: plt})
+                wandb.log({name: wandb.Image(fig)})
                 plt.clf()
 
             wandb.log({"checkpoint/ks/avg/table": wandb.Table(list(results_avg.columns), results_avg)})

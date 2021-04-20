@@ -1,5 +1,5 @@
 data:
-  data_path: "/Users/max/Downloads/HEP/RICH-2021/"
+  data_path: "/Users/mrartemev/Datasets/HEP/RICH2021"
   val_size: 0.1
   download: False
   scaler:

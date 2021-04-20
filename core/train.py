@@ -82,8 +82,8 @@ def train(config: DictConfig) -> None:
                          f" shapes: {data.shape}, {context.shape}, {weight.shape}"
                          f" means: {data.mean()}, {context.mean()}, {weight.mean()}"
                          f" stds: {data.std()}, {context.std()}, {weight.std()}")
-            # trainer.train('C', data, context, weight)
-            # trainer.train('G', data, context, weight)
+            trainer.train('C', data, context, weight)
+            trainer.train('G', data, context, weight)
             # logging metrics every N iterations to save some time on uploads
             if (iteration + 1) % config.utils.log_iter_interval == 0:
                 trainer.model.eval()
